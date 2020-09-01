@@ -1,5 +1,5 @@
 use std::io;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::path::Path;
 use std::io::prelude::*;
 use chrono::NaiveDate;
@@ -8,8 +8,8 @@ use std::process;
 
 /**
  * TODO:
- * [] list all books
- * [] search book by name
+ * [y] list all books
+ * [y] search book by name
  * [] create new book entry
  * [] issue book to borrower
  * [] collect book from borrower
@@ -24,7 +24,7 @@ struct Book {
     author: String,
     year_published: u32,
     borrowed: bool,
-    last_borrow_date: NaiveDate
+    issue_date: NaiveDate
 }
 
 fn main() {
@@ -34,11 +34,11 @@ fn main() {
                 match num {
                     0 => process::exit(0),
                     1 => list_all_book(),
-                    2 => println!("Your input is {}", 2),
-                    3 => println!("Your input is {}", 3),
-                    4 => println!("Your input is {}", 4),
-                    5 => println!("Your input is {}", 5),
-                    6 => println!("Your input is {}", 6),
+                    2 => search_a_book(),
+                    3 => create_a_book(),
+                    4 => println!("Your input is 4"),
+                    5 => println!("Your input is 5"),
+                    6 => println!("Your input is 6"),
                     _ => println!("Please enter from the option provided")
                 }
             },            
@@ -75,6 +75,7 @@ fn menu() -> Result<u8, i8> {
     }    
 }
 
+// list all book
 fn list_all_book() {
     let data_path = Path::new("librarystore");
     let mut file = match File::open(&data_path) {
@@ -98,31 +99,127 @@ fn list_all_book() {
                 println!("Book Author    : {}", book.author);
                 println!("Published Year : {}", book.year_published);
                 println!("Borrow Status  : {}", book.borrowed);
-                println!("Last Borrow on : {}", book.last_borrow_date);
+                println!("Issue on       : {}", book.issue_date);
                 println!("--------------------------------------------");
             }            
-            println!("");
+            println!();            
         }
     }
 }
 
-fn to_book_list(data: &String) -> Result<Vec<Book>, ParseError>{
+// list all book
+fn to_book_list(data: &str) -> Result<Vec<Book>, ParseError>{
     let mut books = vec![];
 
-    for line in data.split("\n") {
-        println!("{:?}", line);
+    for line in data.split('\n') {
+        // println!("{:?}", line);
         if line.trim() != "" {
-            let slice_data: Vec<&str> = line.split(",").collect();
-            println!("{:?}", slice_data);
-            let last_borrow_date = NaiveDate::parse_from_str(slice_data[4].trim(), "%Y-%m-%d")?;
+            let slice_data: Vec<&str> = line.split(',').collect();
+            // println!("{:?}", slice_data);
+            let issue_date = NaiveDate::parse_from_str(slice_data[4].trim(), "%Y-%m-%d")?;
             books.push(Book {
                 name: slice_data[0].trim().to_string(),
                 author: slice_data[1].trim().to_string(),
                 year_published: slice_data[2].trim().parse().unwrap_or_default(),            
                 borrowed: slice_data[3].trim().to_string().parse().unwrap_or_default(),
-                last_borrow_date: last_borrow_date
+                issue_date
             });
         }
     }
     Ok(books)
+}
+
+// search a book
+fn search_a_book() {
+    println!("Please enter your search:");
+    let mut book_name = String::new();
+    io::stdin()
+        .read_line(&mut book_name)
+        .expect("Please enter something to search..");
+
+    if book_name.trim() == "" {
+        println!("Please enter something...");
+    } else {
+        let data_path = Path::new("librarystore");
+        let mut file = match File::open(&data_path) {
+            Err(why) => panic!("No library data store, {}", why),
+            Ok(file) => file
+        };
+        
+        let mut data = String::new();
+        match file.read_to_string(&mut data) {
+            Err(why) => println!("Error when reading file, {}", why),
+            Ok(_) => {
+                let books: Vec<Book> = match to_book_list(&data) {
+                    Err(_) => vec![],
+                    Ok(b) => b
+                };
+                let search_result: Vec<Book> = books.into_iter().filter(|x| x.name.contains(&book_name.trim())).collect();
+                // let search_result = books.iter().filter(|x| x.name == book_name);
+                println!("\n#-------------------------------#");
+                println!("#  Rusty Library Search Result  #"); 
+                println!("#-------------------------------#");
+                if search_result.len() > 0 {
+                    println!("Result found: {}", search_result.len());
+                    println!("--------------------------------------------");
+                    for book in search_result {
+                        println!("Book Name      : {}", book.name);
+                        println!("Book Author    : {}", book.author);
+                        println!("Published Year : {}", book.year_published);
+                        println!("Borrow Status  : {}", book.borrowed);
+                        println!("Issue on       : {}", book.issue_date);
+                        println!("--------------------------------------------");
+                    }
+                } else {
+                    println!("Nothing is found");
+                }
+                println!();       
+            }
+        }
+    }
+}
+
+// create a book
+fn create_a_book() {    
+    println!("Insert new book to library");
+
+    println!("Book Name :");
+    let mut book_name = String::new();
+    io::stdin()
+        .read_line(&mut book_name)
+        .expect("Please enter something...");
+
+    println!("Book Author :");
+    let mut author = String::new();
+    io::stdin()
+        .read_line(&mut author)
+        .expect("Please enter something...");
+
+    println!("Book Published Year [YYYY] :");
+    let mut published_year = String::new();
+    io::stdin()
+        .read_line(&mut published_year)
+        .expect("Please enter something...");
+
+    println!("Issue Date [YYYY-MM-DD] :");
+    let mut issue_date = String::new();
+    io::stdin()
+        .read_line(&mut issue_date)
+        .expect("Please enter something...");
+    
+    let data_path = Path::new("librarystore");
+    let mut file = OpenOptions::new()        
+        .write(true)    
+        .append(true)
+        .open(&data_path)
+        .unwrap();          
+            
+    if let Err(e) = writeln!(&mut file, "{}", format!("{}", format!("{},{},{},{},{}", 
+        book_name.trim(), author.trim(), published_year.trim(), 0.to_string(), issue_date.to_string()))) {
+        println!("{}", e);
+    } else {
+        println!();
+        println!("#[ New book has been added to library ]#");        
+        println!();
+    }
 }
