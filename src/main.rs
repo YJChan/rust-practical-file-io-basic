@@ -10,7 +10,7 @@ use std::process;
  * TODO:
  * [y] list all books
  * [y] search book by name
- * [] create new book entry
+ * [y] create new book entry
  * [] issue book to borrower
  * [] collect book from borrower
  * [] check late payment is needed during book return
@@ -27,6 +27,17 @@ struct Book {
     issue_date: NaiveDate
 }
 
+impl Book {
+    pub fn to_string(&self) -> String {
+        format!("{}", format!("{},{},{},{},{}\n", 
+        &self.name.trim(), 
+        &self.author.trim(), 
+        &self.year_published.to_string(), 
+        &self.borrowed, 
+        &self.issue_date.to_string()))
+    }
+}
+
 fn main() {
     loop {
         match menu() {
@@ -38,7 +49,7 @@ fn main() {
                     3 => create_a_book(),
                     4 => println!("Your input is 4"),
                     5 => println!("Your input is 5"),
-                    6 => println!("Your input is 6"),
+                    6 => delete_a_book(),
                     _ => println!("Please enter from the option provided")
                 }
             },            
@@ -154,8 +165,9 @@ fn search_a_book() {
                     Err(_) => vec![],
                     Ok(b) => b
                 };
-                let search_result: Vec<Book> = books.into_iter().filter(|x| x.name.contains(&book_name.trim())).collect();
-                // let search_result = books.iter().filter(|x| x.name == book_name);
+                let search_result: Vec<Book> = books.into_iter()
+                    .filter(|x| x.name.to_uppercase().contains(&book_name.trim().to_uppercase()))
+                    .collect();                
                 println!("\n#-------------------------------#");
                 println!("#  Rusty Library Search Result  #"); 
                 println!("#-------------------------------#");
@@ -214,7 +226,7 @@ fn create_a_book() {
         .open(&data_path)
         .unwrap();          
             
-    if let Err(e) = writeln!(&mut file, "{}", format!("{}", format!("{},{},{},{},{}", 
+    if let Err(e) = write!(&mut file, "{}", format!("{}", format!("{},{},{},{},{}", 
         book_name.trim(), author.trim(), published_year.trim(), 0.to_string(), issue_date.to_string()))) {
         println!("{}", e);
     } else {
@@ -222,4 +234,61 @@ fn create_a_book() {
         println!("#[ New book has been added to library ]#");        
         println!();
     }
+}
+
+// delete a book
+fn delete_a_book() {
+    println!("Please select a book from below:");
+    let data_path = Path::new("librarystore");
+    let mut file = match File::open(&data_path) {
+        Err(why) => panic!("No library data store, {}", why),
+        Ok(file) => file
+    };
+
+    let mut data = String::new();
+    match file.read_to_string(&mut data) {
+        Err(why) => println!("Error when reading file, {}", why),
+        Ok(_) => {
+            let books: Vec<Book> = match to_book_list(&data) {
+                Err(_) => vec![],
+                Ok(b) => b
+            };
+            println!("\n#----------------------------#");
+            println!("#  Rusty Library Book List   #"); 
+            println!("#----------------------------#");            
+            for (i, book) in books.iter().enumerate() {
+                println!("[{}]", i);
+                println!("Book Name      : {}", book.name);
+                println!("Book Author    : {}", book.author);
+                println!("Published Year : {}", book.year_published);
+                println!("Borrow Status  : {}", book.borrowed);
+                println!("Issue on       : {}", book.issue_date);
+                println!("--------------------------------------------");
+            }        
+            println!();            
+
+            let mut inp = String::new();
+            io::stdin()
+                .read_line(&mut inp).unwrap();
+            let delete_option: usize = inp.trim().parse().unwrap_or_default();
+            let mut updated_file = match File::create(data_path) {
+                Err(why) => panic!("Cannot create new file, {}", why),
+                Ok(file) => file
+            };
+            let mut updated_data = String::new();
+
+            for (i, book) in books.iter().enumerate() {
+                if i != delete_option {
+                    updated_data.push_str(&book.to_string());
+                }
+            }
+
+            match updated_file.write(updated_data.as_bytes()) {
+                Err(err) => println!("Error occured when update file, {}", err),
+                Ok(_) => println!("#[ Library store has been updated ]#")
+            }
+        }
+    }
+
+    
 }
